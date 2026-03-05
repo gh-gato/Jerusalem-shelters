@@ -592,6 +592,28 @@ function goTo(lat,lng,name){
 // LOCATION
 let locationMarker = null;
 let locationCircle = null;
+let nearestLine = null;
+let nearestMarkerHighlight = null;
+
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLng = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+    Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*
+    Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function findNearest(lat, lng) {
+  let best = null, bestDist = Infinity;
+  SHELTERS.forEach(s => {
+    if (!s.lat || !s.lng) return;
+    const d = haversine(lat, lng, s.lat, s.lng);
+    if (d < bestDist) { bestDist = d; best = s; }
+  });
+  return { shelter: best, dist: bestDist };
+}
 
 function locateMe() {
   const btn = document.getElementById('locate-btn');
@@ -606,15 +628,16 @@ function locateMe() {
       const lng = pos.coords.longitude;
       const acc = pos.coords.accuracy;
 
-      if (locationMarker) { locationMarker.remove(); }
-      if (locationCircle) { locationCircle.remove(); }
+      // Clear previous
+      if (locationMarker) locationMarker.remove();
+      if (locationCircle) locationCircle.remove();
+      if (nearestLine) nearestLine.remove();
+      if (nearestMarkerHighlight) nearestMarkerHighlight.remove();
 
+      // User location circle + dot
       locationCircle = L.circle([lat, lng], {
-        radius: acc,
-        color: '#4da6e8',
-        fillColor: '#4da6e8',
-        fillOpacity: 0.12,
-        weight: 1.5
+        radius: acc, color: '#4da6e8', fillColor: '#4da6e8',
+        fillOpacity: 0.12, weight: 1.5
       }).addTo(map);
 
       locationMarker = L.marker([lat, lng], {
@@ -625,7 +648,44 @@ function locateMe() {
         })
       }).addTo(map);
 
-      map.flyTo([lat, lng], 16, { duration: 1.5 });
+      // Find nearest shelter
+      const { shelter, dist } = findNearest(lat, lng);
+      if (shelter) {
+        const distText = dist < 1000
+          ? Math.round(dist) + ' m'
+          : (dist/1000).toFixed(1) + ' km';
+
+        // Dashed line to nearest
+        nearestLine = L.polyline([[lat, lng], [shelter.lat, shelter.lng]], {
+          color: '#f0c94a', weight: 2, dashArray: '6,6', opacity: 0.9
+        }).addTo(map);
+
+        // Gold pulsing ring around nearest shelter
+        nearestMarkerHighlight = L.marker([shelter.lat, shelter.lng], {
+          icon: L.divIcon({
+            className: '',
+            html: '<div style="width:28px;height:28px;border-radius:50%;border:3px solid #f0c94a;box-shadow:0 0 12px rgba(240,201,74,0.8);background:rgba(240,201,74,0.2);"></div>',
+            iconSize: [28,28], iconAnchor: [14,14]
+          }),
+          zIndexOffset: 1000
+        }).addTo(map);
+
+        // Find the marker and open its popup with distance info
+        const entry = markers.find(({s}) => s.lat === shelter.lat && s.lng === shelter.lng);
+        if (entry) {
+          setTimeout(() => entry.m.openPopup(), 1600);
+        }
+
+        // Fit map to show both user and nearest shelter
+        const bounds = L.latLngBounds([[lat, lng], [shelter.lat, shelter.lng]]);
+        map.flyToBounds(bounds, { padding: [80, 80], duration: 1.5 });
+
+        // Show toast
+        showToast('Nearest shelter: ' + shelter.n + ' · ' + distText);
+      } else {
+        map.flyTo([lat, lng], 16, { duration: 1.5 });
+      }
+
       btn.textContent = '📍';
       btn.classList.add('active');
     },
@@ -636,6 +696,20 @@ function locateMe() {
     },
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
   );
+}
+
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(5,10,20,0.92);color:#fff;padding:12px 20px;border-radius:14px;font-size:13px;z-index:9999;border:1px solid rgba(240,201,74,0.5);backdrop-filter:blur(12px);max-width:85vw;text-align:center;pointer-events:none;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 5000);
 }
 
 function closeSearch(){document.getElementById('search-dropdown').style.display='none';}
