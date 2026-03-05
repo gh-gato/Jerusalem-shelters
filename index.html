@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <title>Jerusalem Public Shelters</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+```
+html, body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: 'Inter', sans-serif;
+}
+
+#map {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+#ui > * { pointer-events: auto; }
+
+/* HEADER */
+#header {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding: 20px 24px 64px;
+  background: linear-gradient(to bottom, rgba(5,10,20,0.80) 0%, transparent 100%);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#title h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 16px rgba(0,0,0,0.7);
+  line-height: 1.15;
+}
+#title p {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-top: 5px;
+}
+
+/* CHIPS */
+#stats { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; padding-top: 4px; }
+.chip {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(5,10,20,0.70);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 100px;
+  padding: 6px 14px 6px 10px;
+  backdrop-filter: blur(14px);
+}
+.chip-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.chip span { font-size: 12px; color: rgba(255,255,255,0.85); font-weight: 400; white-space: nowrap; }
+
+/* FILTERS */
+#filters {
+  position: absolute;
+  top: 66px; left: 14px; right: 14px;
+  display: flex; gap: 5px;
+  flex-wrap: wrap;
+}
+.fbtn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 10px;
+  border-radius: 100px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(5,10,20,0.75);
+  backdrop-filter: blur(14px);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px; font-weight: 400;
+  color: rgba(255,255,255,0.8);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  -webkit-user-select: none; user-select: none;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.fbtn:hover { background: rgba(255,255,255,0.14); }
+.fbtn.on { background: #fff; color: #111; border-color: #fff; font-weight: 600; }
+.fbtn-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink:0; }
+
+/* LEGEND */
+#legend {
+  position: absolute;
+  bottom: 40px; left: 24px;
+  background: rgba(5,10,20,0.80);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 18px;
+  padding: 18px 22px;
+  backdrop-filter: blur(18px);
+}
+#legend h4 {
+  font-size: 9px; color: rgba(255,255,255,0.38);
+  letter-spacing: 0.2em; text-transform: uppercase;
+  margin-bottom: 13px; font-weight: 500;
+}
+.leg-row { display: flex; align-items: center; gap: 11px; margin-bottom: 9px; }
+.leg-row:last-child { margin-bottom: 0; }
+.leg-dot { width: 13px; height: 13px; border-radius: 50%; border: 2.5px solid rgba(255,255,255,0.3); flex-shrink: 0; }
+.leg-row span { font-size: 13px; color: rgba(255,255,255,0.78); font-weight: 300; }
+
+/* COUNTER */
+#counter {
+  position: absolute;
+  bottom: 40px; left: 50%; transform: translateX(-50%);
+  background: rgba(5,10,20,0.75);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 100px;
+  padding: 9px 24px;
+  backdrop-filter: blur(14px);
+  white-space: nowrap;
+  font-size: 12px; color: rgba(255,255,255,0.45);
+  letter-spacing: 0.07em;
+}
+#counter strong {
+  font-family: 'Playfair Display', serif;
+  font-size: 17px; font-weight: 700;
+  color: #fff; margin-right: 4px;
+}
+
+/* SEARCH */
+#search-wrap {
+  position: absolute;
+  bottom: 40px; right: 24px;
+  width: 290px;
+}
+#search-inner { position: relative; }
+#search-icon {
+  position: absolute; left: 15px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 15px; pointer-events: none; line-height: 1;
+}
+#search-input {
+  width: 100%;
+  padding: 14px 16px 14px 44px;
+  background: rgba(5,10,20,0.80);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px; color: #fff;
+  outline: none;
+  backdrop-filter: blur(18px);
+  -webkit-appearance: none;
+  transition: border-color 0.2s;
+}
+#search-input::placeholder { color: rgba(255,255,255,0.32); }
+#search-input:focus { border-color: rgba(255,255,255,0.42); }
+#search-dropdown {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px); left: 0; right: 0;
+  background: rgba(8,14,30,0.97);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px;
+  overflow: hidden;
+  max-height: 280px; overflow-y: auto;
+  backdrop-filter: blur(20px);
+}
+.sr-item {
+  padding: 12px 18px; cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  transition: background 0.12s;
+}
+.sr-item:hover { background: rgba(255,255,255,0.07); }
+.sr-item:last-child { border-bottom: none; }
+.sr-name { font-size: 13px; color: rgba(255,255,255,0.9); font-weight: 500; }
+.sr-addr { font-size: 11px; color: rgba(255,255,255,0.38); margin-top: 2px; }
+
+/* POPUPS */
+.leaflet-popup-content-wrapper {
+  background: rgba(8,14,30,0.97) !important;
+  border: 1px solid rgba(255,255,255,0.14) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.7) !important;
+  padding: 0 !important;
+}
+.leaflet-popup-content { margin: 0 !important; }
+.leaflet-popup-tip-container { display: none; }
+.leaflet-popup-close-button { color: rgba(255,255,255,0.3) !important; top: 12px !important; right: 14px !important; font-size: 22px !important; }
+.pu { padding: 22px 24px; min-width: 240px; max-width: 300px; }
+.pu-tag { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 7px; }
+.pu-name { font-family: 'Playfair Display', serif; font-size: 17px; color: #fff; line-height: 1.25; margin-bottom: 14px; font-weight: 500; }
+.pu-row { display: flex; gap: 10px; margin-bottom: 6px; align-items: flex-start; }
+.pu-lbl { font-size: 9px; color: rgba(255,255,255,0.32); text-transform: uppercase; letter-spacing: 0.1em; min-width: 62px; padding-top: 2px; }
+.pu-val { font-size: 13px; color: rgba(255,255,255,0.72); line-height: 1.4; }
+.pu-cap { display: flex; gap: 22px; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.07); }
+.pu-stat .v { font-family: 'Playfair Display', serif; font-size: 24px; color: #fff; font-weight: 700; }
+.pu-stat .l { font-size: 9px; color: rgba(255,255,255,0.32); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 2px; }
+
+/* Leaflet overrides */
+.leaflet-control-zoom { margin-right: 18px !important; margin-bottom: 100px !important; }
+.leaflet-control-zoom a {
+  width: 40px !important; height: 40px !important; line-height: 40px !important;
+  background: rgba(5,10,20,0.82) !important;
+  border-color: rgba(255,255,255,0.15) !important;
+  color: #fff !important; font-size: 22px !important;
+  backdrop-filter: blur(12px);
+}
+.leaflet-control-zoom a:hover { background: rgba(255,255,255,0.15) !important; }
+.leaflet-control-attribution { background: rgba(0,0,0,0.35) !important; color: rgba(255,255,255,0.28) !important; font-size: 9px !important; }
+.leaflet-control-attribution a { color: rgba(255,255,255,0.38) !important; }
+
+
+#search-dropdown::-webkit-scrollbar { width: 3px; }
+#search-dropdown::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 2px; }
+
+/* LOCATION BUTTON */
+#locate-btn {
+  position: absolute;
+  bottom: 220px; right: 18px;
+  z-index: 900;
+  width: 40px; height: 40px;
+  background: rgba(5,10,20,0.85);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(12px);
+  transition: background 0.2s;
+  -webkit-user-select: none; user-select: none;
+  pointer-events: auto;
+}
+#locate-btn:hover { background: rgba(255,255,255,0.15); }
+#locate-btn.active { background: #4da6e8; border-color: #4da6e8; }
+```
+
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="ui">
+  <div id="header">
+    <div id="title">
+      <h1>Jerusalem Public Shelters</h1>
+
+```
+</div>
+```
+
+  </div>
+
+  <div id="filters">
+    <button class="fbtn on" id="f-all" onclick="applyFilter('all')"><div class="fbtn-dot" style="background:#aaa"></div>All <span id="sc-all" style="opacity:0.5;margin-left:2px"></span></button>
+    <button class="fbtn" id="f-public" onclick="applyFilter('public')"><div class="fbtn-dot" style="background:#4da6e8"></div>Shelters <span id="sc" style="opacity:0.5;margin-left:2px"></span></button>
+    <button class="fbtn" id="f-parking" onclick="applyFilter('parking')"><div class="fbtn-dot" style="background:#3dbfa8"></div>Parking <span id="pc" style="opacity:0.5;margin-left:2px"></span></button>
+    <button class="fbtn" id="f-access" onclick="applyFilter('access')"><div class="fbtn-dot" style="background:#f0c94a"></div>Accessible <span id="ac" style="opacity:0.5;margin-left:2px"></span></button>
+  </div>
+
+  <div id="search-wrap">
+    <div id="search-inner">
+      <span id="search-icon">🔍</span>
+      <input id="search-input" type="text" placeholder="Search by name, address or neighbourhood…"
+        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+        oninput="doSearch(this.value)"
+        onfocus="doSearch(this.value)"
+        onblur="setTimeout(closeSearch,200)"/>
+      <div id="search-dropdown"></div>
+    </div>
+  </div>
+
+<button id="locate-btn" onclick="locateMe()" title="Show my location">📍</button>
+
+</div>
+
+<script>
+const SHELTERS = [
+  // Baka
+  {n:"Public Shelter No. 681",a:"8 Efrayim St.",nb:"Baka",cap:80,area:100,op:"Jerusalem Municipality",lat:31.75959347,lng:35.2189683,t:"pub",acc:false},
+  {n:"Public Shelter No. 682",a:"14 Reuven St.",nb:"Baka",cap:108,area:135,op:"Jerusalem Municipality",lat:31.75951784,lng:35.2188286,t:"pub",acc:false},
+  {n:"Public Shelter No. 683",a:"54 Hebron Rd.",nb:"Baka",cap:136,area:170,op:"Jerusalem Municipality",lat:31.76002206,lng:35.2235262,t:"pub",acc:false},
+  {n:"Public Shelter No. 684",a:"6 Esther HaMalka St.",nb:"Baka",cap:236,area:295,op:"Jerusalem Municipality",lat:31.758750,lng:35.222640,t:"pub",acc:false},
+  {n:"Public Shelter No. 685",a:"6 Mordechai HaYehudi St.",nb:"Baka",cap:160,area:200,op:"Jerusalem Municipality",lat:31.75722449,lng:35.22199465,t:"pub",acc:false},
+  {n:"Public Shelter No. 836",a:"27 Menashe St.",nb:"Baka",cap:80,area:100,op:"Jerusalem Municipality",lat:31.75968621,lng:35.21989257,t:"pub",acc:false},
+  {n:"Public Shelter No. 980",a:"22 Rivka St.",nb:"Baka",cap:80,area:100,op:"Jerusalem Municipality",lat:31.7551778,lng:35.21700545,t:"pub",acc:false},
+  {n:"Public Shelter No. 984",a:"11 Ya'el St.",nb:"Baka",cap:128,area:160,op:"Jerusalem Municipality",lat:31.76190746,lng:35.2212796,t:"pub",acc:false},
+  {n:"Public Shelter No. 995",a:"3 Levi St.",nb:"Baka",cap:80,area:100,op:"Baka Community Administration",lat:31.75755932,lng:35.220897,t:"pub",acc:false},
+  {n:"Bayit VeGan No. 742",a:"7 Sha'arei Tora St.",nb:"Bayit VeGan",cap:216,area:270,op:"Jerusalem Municipality",lat:31.76591212,lng:35.18298046,t:"pub",acc:false},
+  {n:"Bayit VeGan No. 743",a:"39 Bayit VaGan St.",nb:"Bayit VeGan",cap:92,area:115,op:"Jerusalem Municipality",lat:31.76926455,lng:35.18451955,t:"pub",acc:false},
+  {n:"Beit HaKerem No. 744",a:"4 HaBanai St.",nb:"Beit HaKerem",cap:136,area:170,op:"Jerusalem Municipality",lat:31.77512976,lng:35.19041839,t:"pub",acc:false},
+  {n:"Beit HaKerem No. 745",a:"30 HaBanai St.",nb:"Beit HaKerem",cap:136,area:170,op:"Jerusalem Municipality",lat:31.7775352,lng:35.1922193,t:"pub",acc:false},
+  {n:"Public Shelter No. 841",a:"25 Yoel St.",nb:"Beit Yisrael",cap:80,area:100,op:"Mosiyof synagogue",lat:31.79120318,lng:35.22139609,t:"pub",acc:false},
+  {n:"Public Shelter No. 908",a:"22 Shimshon Polanski St.",nb:"Beit Yisrael",cap:80,area:100,op:"Bucharim Community Administration",lat:31.79208743,lng:35.2232357,t:"pub",acc:false},
+  {n:"Public Shelter No. 609",a:"23 Yisa Bracha St.",nb:"Bukharim",cap:200,area:250,op:"Jerusalem Municipality",lat:31.79229011,lng:35.2176755,t:"pub",acc:false},
+  {n:"Public Shelter No. 612",a:"16 Yoel St.",nb:"Bukharim",cap:40,area:50,op:"Karlin Hasidic community",lat:31.78987955,lng:35.22089024,t:"pub",acc:false},
+  {n:"Public Shelter No. 910",a:"Ovadya St 22",nb:"Bukharim",cap:80,area:100,op:"Karlin Hassidic community",lat:31.79171933,lng:35.21486308,t:"pub",acc:false},
+  {n:"Public Shelter No. 639",a:"2 Michel Pines St.",nb:"City Center",cap:200,area:250,op:"Degel Yerushalayim",lat:31.785705,lng:35.215130,t:"pub",acc:false},
+  {n:"Public Shelter No. 932",a:"38 HaGilboa St.",nb:"City Center",cap:80,area:100,op:"Lev Ha'Ir Community Administration",lat:31.78310575,lng:35.21285728,t:"pub",acc:false},
+  {n:"Public Shelter No. 973",a:"5 HaRav Aviyada St.",nb:"City Center",cap:80,area:100,op:"Jerusalem Municipality",lat:31.77791035,lng:35.21665559,t:"pub",acc:false},
+  {n:"Public Shelter No. 974",a:"9 Shmuel Hanagid St.",nb:"City Center",cap:80,area:100,op:"Jerusalem Municipality",lat:31.77988294,lng:35.2147312,t:"pub",acc:false},
+  {n:"Public Shelter No. 985",a:"13 Strauss St.",nb:"City Center",cap:40,area:50,op:"Helek MiMeni organization",lat:31.78547133,lng:35.21869972,t:"pub",acc:false},
+  {n:"Public Shelter No. 903",a:"82 Homat HaTzalafim St.",nb:"Ein Kerem",cap:96,area:120,op:"Artists studio",lat:31.76842599,lng:35.16359315,t:"pub",acc:false},
+  {n:"Public Shelter No. 672",a:"10 Ruth St.",nb:"Emek Refa'im",cap:120,area:150,op:"Jerusalem Municipality",lat:31.76506375,lng:35.21736907,t:"pub",acc:false},
+  {n:"Public Shelter No. 670",a:"9 Bostanai St.",nb:"Emek Refa'im",cap:112,area:140,op:"Jerusalem Municipality",lat:31.76565605,lng:35.21287922,t:"pub",acc:false},
+  {n:"Public Shelter No. 673",a:"3 Malal St.",nb:"Emek Refa'im",cap:91,area:114,op:"Jerusalem Municipality",lat:31.78075326,lng:35.21629892,t:"pub",acc:false},
+  {n:"Public Shelter No. 674",a:"7 Bachar St.",nb:"Emek Refa'im",cap:120,area:150,op:"Jerusalem Municipality",lat:31.76617023,lng:35.218209,t:"pub",acc:false},
+  {n:"Public Shelter No. 676",a:"6 Emile Zola St.",nb:"Emek Refa'im",cap:80,area:100,op:"Jerusalem Municipality",lat:31.76455263,lng:35.22099657,t:"pub",acc:false},
+  {n:"Public Shelter No. 677",a:"6 Wyndham Deedes St.",nb:"Emek Refa'im",cap:232,area:290,op:"Jerusalem Municipality",lat:31.76403005,lng:35.22126489,t:"pub",acc:false},
+  {n:"Public Shelter No. 693",a:"9 Yotam St.",nb:"Emek Refa'im",cap:136,area:170,op:"Jerusalem Municipality",lat:31.76274013,lng:35.21468592,t:"pub",acc:false},
+  {n:"Public Shelter No. 697",a:"68 Emek Refa'im St.",nb:"Emek Refa'im",cap:128,area:160,op:"Jerusalem Municipality",lat:31.76103535,lng:35.21576369,t:"pub",acc:false},
+  {n:"Public Shelter No. 804",a:"8 HaMelits St.",nb:"Emek Refa'im",cap:80,area:100,op:"Jerusalem Municipality",lat:31.76488511,lng:35.21965502,t:"pub",acc:false},
+  {n:"Public Shelter No. 998",a:"6 Aba Berdichev St.",nb:"French Hill",cap:80,area:100,op:"Jerusalem Municipality",lat:31.80571068,lng:35.24163187,t:"pub",acc:false},
+  {n:"Public Shelter No. 695",a:"2 Amatsiya St.",nb:"German Colony",cap:200,area:250,op:"Chabad synagogue",lat:31.76231446,lng:35.21556613,t:"pub",acc:false},
+  {n:"Public Shelter No. 621",a:"8 Hoshe'a St.",nb:"Geula",cap:80,area:100,op:"Jerusalem Municipality",lat:31.78971852,lng:35.2196259,t:"pub",acc:false},
+  {n:"Public Shelter No. 637",a:"18 Nahman MiBreslev St.",nb:"Geula",cap:80,area:100,op:"Jerusalem Municipality",lat:31.7877374,lng:35.21997837,t:"pub",acc:false},
+  {n:"Public Shelter No. 830",a:"25 Tsfanya St.",nb:"Geula",cap:80,area:100,op:"Bucharim Community Administration",lat:31.7915136,lng:35.21721693,t:"pub",acc:false},
+  {n:"Public Shelter No. 904",a:"7 HaZayit St.",nb:"Geula",cap:100,area:125,op:"Jerusalem Municipality",lat:31.79038842,lng:35.2112935,t:"pub",acc:false},
+  {n:"Public Shelter No. 715",a:"52 David Shimoni St.",nb:"Rassco-Givat HaVradim",cap:144,area:180,op:"Jerusalem Municipality",lat:31.76136372,lng:35.20108822,t:"pub",acc:false},
+  {n:"Public Shelter No. 949",a:"33 HaTayasim St.",nb:"Rassco-Givat HaVradim",cap:80,area:100,op:"Ginot Ha'Ir Community Administration",lat:31.76547348,lng:35.20729202,t:"pub",acc:false},
+  {n:"Public Shelter No. 808",a:"27 Yisrael Najara St.",nb:"Givat Shaul",cap:80,area:100,op:"Meitarim Community Administration",lat:31.79066778,lng:35.19194561,t:"pub",acc:false},
+  {n:"Public Shelter No. 726",a:"123 HaNurit St.",nb:"Ir Ganim",cap:280,area:350,op:"Jerusalem Municipality",lat:31.75304368,lng:35.17212095,t:"pub",acc:false},
+  {n:"Public Shelter No. 727",a:"104 HaNurit St.",nb:"Ir Ganim",cap:148,area:120,op:"Jerusalem Municipality",lat:31.75457225,lng:35.17056825,t:"pub",acc:false},
+  {n:"Public Shelter No. 728",a:"102 HaNurit St.",nb:"Ir Ganim",cap:148,area:183,op:"Jerusalem Municipality",lat:31.754851,lng:35.17017787,t:"pub",acc:false},
+  {n:"Public Shelter No. 829",a:"9 HaRakefet St.",nb:"Ir Ganim",cap:32,area:100,op:"Chai Tayeb synagogue",lat:31.75350048,lng:35.166039,t:"pub",acc:false},
+  {n:"Public Shelter No. 840",a:"70 Costa Rica St.",nb:"Ir Ganim",cap:32,area:100,op:"Beit Chabad building",lat:31.75303908,lng:35.16703205,t:"pub",acc:true},
+  {n:"Public Shelter No. 901",a:"13 Iceland St.",nb:"Ir Ganim",cap:120,area:150,op:"David Moshe synagogue",lat:31.75927128,lng:35.16653153,t:"pub",acc:false},
+  {n:"Public Shelter No. 902",a:"29 HaNurit St.",nb:"Ir Ganim",cap:200,area:250,op:"Ezra Movement",lat:31.75487408,lng:35.16903666,t:"pub",acc:false},
+  {n:"Public Shelter No. 905",a:"1 HaNerd St.",nb:"Ir Ganim",cap:110,area:138,op:"Ezra Youth Movement",lat:31.75717138,lng:35.1708159,t:"pub",acc:false},
+  {n:"Public Shelter No. 726 Bet",a:"125 HaNurit St.",nb:"Ir Ganim",cap:96,area:120,op:"Jerusalem Municipality",lat:31.75252344,lng:35.171552,t:"pub",acc:false},
+  {n:"Public Shelter No. 726 Alef",a:"124 HaNurit St.",nb:"Ir Ganim",cap:80,area:120,op:"Jerusalem Municipality",lat:31.75270968,lng:35.17106527,t:"pub",acc:false},
+  {n:"Public Shelter No. 718",a:"6 Rabbi Tzadok St.",nb:"Katamon",cap:96,area:120,op:"Gonenim Community Administration",lat:31.75450818,lng:35.19382965,t:"pub",acc:false},
+  {n:"Public Shelter No. 755",a:"3 Dov Hoz St.",nb:"Katamon",cap:80,area:100,op:"Jerusalem Municipality",lat:31.75640292,lng:35.19666642,t:"pub",acc:false},
+  {n:"Public Shelter No. 756",a:"1 San Martin St.",nb:"Katamon",cap:80,area:100,op:"Torah BeTziyon Tzedek",lat:31.75628558,lng:35.1946299,t:"pub",acc:false},
+  {n:"Public Shelter No. 757",a:"5 HaShomer St.",nb:"Katamon",cap:80,area:100,op:"Jerusalem Municipality",lat:31.75571857,lng:35.19787365,t:"pub",acc:false},
+  {n:"Public Shelter No. 805",a:"21 Yordei HaSira St.",nb:"Katamon",cap:296,area:370,op:"Jerusalem Municipality",lat:31.76235525,lng:35.21082471,t:"pub",acc:false},
+  {n:"Public Shelter No. 817",a:"7 Yehoshua Ben Gamla St.",nb:"Katamon",cap:96,op:"Ginot Ha'Ir Community Administration",lat:31.76073943,lng:35.21228162,t:"pub",acc:false},
+  {n:"Public Shelter No. 824",a:"31 Rashbag St.",nb:"Katamon",cap:120,area:150,op:"Mikro Theater",lat:31.7554334,lng:35.2086146,t:"pub",acc:false},
+  {n:"Public Shelter No. 825",a:"24 Elazar Ben Yair St.",nb:"Katamon",cap:120,area:150,op:"Ariel youth movement",lat:31.75360963,lng:35.20166873,t:"pub",acc:false},
+  {n:"Public Shelter No. 828",a:"10 HaRav Hasda St.",nb:"Katamon",cap:80,area:100,op:"Boxing club",lat:31.75971235,lng:35.21328746,t:"pub",acc:false},
+  {n:"Public Shelter No. 831",a:"7 Dov Hoz St.",nb:"Katamon",cap:120,area:150,op:"Keshet Arts",lat:31.7562636,lng:35.1954492,t:"pub",acc:false},
+  {n:"Public Shelter No. 842",a:"8 Bar Yochai St.",nb:"Katamon",cap:139,area:174,op:"Ethiopian origin synagogue",lat:31.75311816,lng:35.19538627,t:"pub",acc:false},
+  {n:"Public Shelter No. 906",a:"2 Bar Yochai St.",nb:"Katamon",cap:80,area:100,op:"Gal Avraham synagogue",lat:31.75430501,lng:35.19884543,t:"pub",acc:false},
+  {n:"Public Shelter No. 965",a:"7 Yitzhak Sadeh St.",nb:"Katamon",cap:80,area:100,op:"Havatzelet HaSharon synagogue",lat:31.75373649,lng:35.19636583,t:"pub",acc:false},
+  {n:"Public Shelter No. 967",a:"7 Antignos St.",nb:"Katamon",cap:80,area:100,op:"Ariel movement",lat:31.75888667,lng:35.209264,t:"pub",acc:false},
+  {n:"Public Shelter No. 969",a:"16 Yossi Ben Yo'ezer St.",nb:"Katamon",cap:80,area:100,op:"Sports Division",lat:31.75687008,lng:35.20875076,t:"pub",acc:false},
+  {n:"Public Shelter No. 976",a:"41 Avraham ElMaliach St.",nb:"Katamon",cap:40,area:50,op:"Organization of Israelis of Kurdish origin",lat:31.75536971,lng:35.19197755,t:"pub",acc:true},
+  {n:"Public Shelter No. 981",a:"27 Avraham Elmaliach St.",nb:"Katamon",cap:40,area:50,op:"Tzofim",lat:31.75434157,lng:35.19200820,t:"pub",acc:false},
+  {n:"Public Shelter No. 987",a:"38 Yohanan Ben Zakai St.",nb:"Katamon",cap:80,area:100,op:"Ohel Moshe synagogue",lat:31.75922677,lng:35.20898060,t:"pub",acc:false},
+  {n:"Public Shelter No. 721",a:"29 Uruguay St.",nb:"Kiryat Yovel",cap:104,area:130,op:"Community Administration",lat:31.75547995,lng:35.17732316,t:"pub",acc:false},
+  {n:"Public Shelter No. 722",a:"67 Avraham Stern St.",nb:"Kiryat Yovel",cap:104,area:130,op:"Jerusalem Municipality",lat:31.75637467,lng:35.17666523,t:"pub",acc:false},
+  {n:"Public Shelter No. 723",a:"51 Avraham Stern St.",nb:"Kiryat Yovel",cap:104,area:130,op:"Jerusalem Municipality",lat:31.75424528,lng:35.17664425,t:"pub",acc:true},
+  {n:"Public Shelter No. 724",a:"9 Volta Ilit St.",nb:"Kiryat Yovel",cap:72,area:90,op:"Jerusalem Municipality",lat:31.75837336,lng:35.17758566,t:"pub",acc:false},
+  {n:"Public Shelter No. 736",a:"8 Chile St.",nb:"Kiryat Yovel",cap:160,area:200,op:"Yuvalim Community Administration",lat:31.76074271,lng:35.1704658,t:"pub",acc:false},
+  {n:"Public Shelter No. 737",a:"32 Janus Korczak St.",nb:"Kiryat Yovel",cap:120,area:150,op:"Mishkan Mordechai synagogue",lat:31.76016281,lng:35.1720983,t:"pub",acc:true},
+  {n:"Public Shelter No. 738",a:"78 Anielewicz St.",nb:"Kiryat Yovel",cap:72,area:90,op:"Bnei Akiva",lat:31.76217764,lng:35.17317009,t:"pub",acc:false},
+  {n:"Public Shelter No. 739",a:"3 Schmorak St.",nb:"Kiryat Yovel",cap:72,area:90,op:"Hashomer Hatzair",lat:31.76613405,lng:35.17604607,t:"pub",acc:false},
+  {n:"Public Shelter No. 814",a:"3 Volta Ilit St.",nb:"Kiryat Yovel",cap:104,area:130,op:"Yuvalim Community Administration",lat:31.75925474,lng:35.17712367,t:"pub",acc:false},
+  {n:"Public Shelter No. 815",a:"2 Aharon Rabinovich St.",nb:"Kiryat Yovel",cap:134,area:168,op:"Music institute",lat:31.76531568,lng:35.1752983,t:"pub",acc:false},
+  {n:"Public Shelter No. 963",a:"11 Yisrael Zangvill St.",nb:"Kiryat Yovel",cap:80,area:100,op:"Siach Yisrael synagogue",lat:31.76583584,lng:35.17732240,t:"pub",acc:false},
+  {n:"Public Shelter No. 964",a:"8 Meir Grunwald St.",nb:"Kiryat Yovel",cap:144,op:"Jerusalem Municipality",lat:31.75728607,lng:35.17602160,t:"pub",acc:false},
+  {n:"Public Shelter No. 983",a:"10 Gordon St.",nb:"Kiryat Yovel",cap:80,area:100,op:"Ezra youth movement",lat:31.76657686,lng:35.17703862,t:"pub",acc:true},
+  {n:"Public Shelter No. 992",a:"19 Etinger St.",nb:"Kiryat Yovel",cap:80,area:100,op:"Jerusalem Municipality",lat:31.76325667,lng:35.17748120,t:"pub",acc:false},
+  {n:"Public Shelter No. 993",a:"3 Kleinman St.",nb:"Kiryat Yovel",cap:80,area:100,op:"Mashu-Mashu Theatre",lat:31.76409128,lng:35.1746754,t:"pub",acc:false},
+  {n:"Public Shelter No. 991",a:"2 Avraham Sharon St.",nb:"Kiryat Yovel",cap:null,op:"",lat:31.76412700,lng:35.17301330,t:"pub",acc:false},
+  {n:"Public Shelter No. 729",a:"7 Dahomey St.",nb:"Kiryat Menachem",cap:200,area:250,op:"Ganim Community Administration",lat:31.75615742,lng:35.1658768,t:"pub",acc:false},
+  {n:"Public Shelter No. 730",a:"3 Dahomey St.",nb:"Kiryat Menachem",cap:156,area:196,op:"Magen David synagogue",lat:31.75827574,lng:35.16679340,t:"pub",acc:false},
+  {n:"Public Shelter No. 734",a:"17 Iceland St.",nb:"Kiryat Menachem",cap:104,area:130,op:"Jerusalem Municipality",lat:31.75967074,lng:35.16537727,t:"pub",acc:true},
+  {n:"Public Shelter No. 803",a:"17 Henrietta Szold St.",nb:"Kiryat Menachem",cap:90,area:113,op:"Darchei Hayim yeshiva",lat:31.75954196,lng:35.16691162,t:"pub",acc:false},
+  {n:"Public Shelter No. 827",a:"4 Mexico St.",nb:"Kiryat Menachem",cap:80,op:"Ariel youth movement",lat:31.75898,lng:35.16878,t:"pub",acc:false},
+  {n:"Public Shelter No. 977",a:"23 Gat St.",nb:"Kiryat Moshe",cap:80,area:100,op:"Meitarim Community Administration",lat:31.78641411,lng:35.1973343,t:"pub",acc:false},
+  {n:"Public Shelter No. 978",a:"13 HaRav Tzvi Yehuda St.",nb:"Kiryat Moshe",cap:80,area:100,op:"Meitarim Community Administration",lat:31.78753750,lng:35.19555009,t:"pub",acc:false},
+  {n:"Public Shelter No. 667",a:"22 HaPalmach St.",nb:"Kiryat Shmuel",cap:144,area:180,op:"Jerusalem Municipality",lat:31.76748710,lng:35.21104393,t:"pub",acc:false},
+  {n:"Public Shelter No. 971",a:"16 HaPalmach St.",nb:"Kiryat Shmuel",cap:80,area:100,op:"Ginot Ha'ir Community Administration",lat:31.76784826,lng:35.21202050,t:"pub",acc:true},
+  {n:"Public Shelter No. 648",a:"15 Nahar Prat St.",nb:"Mahane Yehuda",cap:188,area:236,op:"Jerusalem Municipality",lat:31.78336583,lng:35.20939807,t:"pub",acc:false},
+  {n:"Public Shelter No. 821",a:"24 Einayim LaMishpat St.",nb:"Mahane Yehuda",cap:96,area:120,op:"Lev Ha'Ir Community Administration",lat:31.78299762,lng:35.2136024,t:"pub",acc:false},
+  {n:"Public Shelter No. 935",a:"28 Be'er Sheva St.",nb:"Mahane Yehuda",cap:136,area:170,op:"Community synagogue",lat:31.7827654,lng:35.21055875,t:"pub",acc:false},
+  {n:"Public Shelter No. 961",a:"17 Even Sapir St.",nb:"Mahane Yehuda",cap:80,area:100,op:"Ariel youth movement",lat:31.78076286,lng:35.21112847,t:"pub",acc:false},
+  {n:"Public Shelter No. 813",a:"7 Kdoshei Struma St.",nb:"Malha",cap:96,op:"Jerusalem Municipality",lat:31.7556061,lng:35.1832669,t:"pub",acc:false},
+  {n:"Public Shelter No. 632",a:"87 Mea Shearim St.",nb:"Mea Shearim",cap:64,area:80,op:"Jerusalem Municipality",lat:31.78581751,lng:35.22459891,t:"pub",acc:false},
+  {n:"Public Shelter No. 826",a:"6 Otsar HaSfarim St.",nb:"Mea She'arim",cap:120,area:150,op:"Moreshet HaNahal yeshiva",lat:31.78649294,lng:35.2253953,t:"pub",acc:false},
+  {n:"Public Shelter No. 641",a:"25 Kfar Nahum St.",nb:"Mekor Baruch",cap:144,area:180,op:"HaMeor Nativ Kodesh",lat:31.78927688,lng:35.21424313,t:"pub",acc:false},
+  {n:"Public Shelter No. 643",a:"73 Malkei Israel St.",nb:"Mekor Baruch",cap:320,area:400,op:"Jerusalem Municipality",lat:31.79060663,lng:35.21083998,t:"pub",acc:false},
+  {n:"Public Shelter No. 812",a:"109 Rashi St.",nb:"Mekor Baruch",cap:88,area:110,op:"Jerusalem Municipality",lat:31.78890176,lng:35.20742335,t:"pub",acc:false},
+  {n:"Public Shelter No. 839",a:"14 Tashbatz St.",nb:"Mekor Baruch",cap:80,area:100,op:"Jerusalem Municipality",lat:31.78743779,lng:35.16634432,t:"pub",acc:false},
+  {n:"Public Shelter No. 909",a:"7 Yehuda HaMaccabi St.",nb:"Mekor Baruch",cap:96,area:120,op:"Toar Gallery",lat:31.78877202,lng:35.20942097,t:"pub",acc:false},
+  {n:"Public Shelter No. 751",a:"10 HaAyin Het St.",nb:"Morasha",cap:80,op:"Musrara photography school",lat:31.78310141,lng:35.22640407,t:"pub",acc:false},
+  {n:"Public Shelter No. 752",a:"21 HaAyin Het St.",nb:"Morasha",cap:80,area:100,op:"Musrara photography school",lat:31.78154504,lng:35.22675129,t:"pub",acc:false},
+  {n:"Public Shelter No. 753",a:"16 Kheil HaHandasa St.",nb:"Morasha",cap:80,area:100,op:"Eshkolot Community Administration",lat:31.78579592,lng:35.2270983,t:"pub",acc:false},
+  {n:"Public Shelter No. 657",a:"21 Tsfat St.",nb:"Nachlaot",cap:400,op:"Jerusalem Municipality",lat:31.77968218,lng:35.21119735,t:"pub",acc:false},
+  {n:"Public Shelter No. 939",a:"17 Neve Sha'anan St.",nb:"Neve Sha'anan",cap:80,area:100,op:"Koom-Koom Theatre",lat:31.77218105,lng:35.20100356,t:"pub",acc:true},
+  {n:"Public Shelter No. 671",a:"22 Kaf Tet BeNovember St.",nb:"Old Katamon",cap:128,area:160,op:"Jerusalem Municipality",lat:31.76616707,lng:35.21380395,t:"pub",acc:true},
+  {n:"Public Shelter No. 696",a:"3 Reish Lakish St.",nb:"Old Katamon",cap:131,area:164,op:"Jerusalem Municipality",lat:31.76129246,lng:35.21325687,t:"pub",acc:false},
+  {n:"Public Shelter No. 702",a:"12 Halafta St.",nb:"Old Katamon",cap:304,area:380,op:"Jerusalem Municipality",lat:31.75967715,lng:35.20753835,t:"pub",acc:false},
+  {n:"Public Shelter No. 703",a:"53 Yohanan Ben Zakai St.",nb:"Old Katamon",cap:136,area:170,op:"Zchut Avot synagogue",lat:31.7563287,lng:35.20489024,t:"pub",acc:false},
+  {n:"Public Shelter No. 923",a:"15 Elazar HaModa'i St.",nb:"Old Katamon",cap:80,area:100,op:"Jerusalem Municipality",lat:31.76185405,lng:35.21380463,t:"pub",acc:false},
+  {n:"Public Shelter No. 937",a:"38 Hizkiyahu HaMelech St.",nb:"Old Katamon",cap:80,area:100,op:"Jerusalem Municipality",lat:31.76174784,lng:35.20969289,t:"pub",acc:false},
+  {n:"Public Shelter No. 658",a:"13 Ibn Ezra St.",nb:"Rehavia",cap:64,area:80,op:"Jerusalem Municipality",lat:31.77560140,lng:35.21411710,t:"pub",acc:false},
+  {n:"Public Shelter No. 659",a:"15 Ibn Gabirol St.",nb:"Rehavia",cap:128,area:160,op:"Jerusalem Municipality",lat:31.77511106,lng:35.21539432,t:"pub",acc:false},
+  {n:"Public Shelter No. 809",a:"9 Rashba St.",nb:"Rehavia",cap:72,area:90,op:"Jerusalem Municipality",lat:31.77325644,lng:35.21072878,t:"pub",acc:false},
+  {n:"Public Shelter No. 810",a:"9 Ovadia MeBartenora St.",nb:"Rehavia",cap:120,area:150,op:"Jerusalem Municipality",lat:31.77326342,lng:35.21668807,t:"pub",acc:false},
+  {n:"Public Shelter No. 816",a:"50 Azza St.",nb:"Rehavia",cap:96,area:120,op:"Holocaust survivors organization",lat:31.77160326,lng:35.21238599,t:"pub",acc:false},
+  {n:"Public Shelter No. 835",a:"18 Arlozorov St.",nb:"Rehavia",cap:152,area:190,op:"Jerusalem Municipality",lat:31.77226266,lng:35.21589869,t:"pub",acc:false},
+  {n:"Public Shelter No. 972",a:"26 AlHarizi St.",nb:"Rehavia",cap:80,area:100,op:"Beit Yael",lat:31.77628089,lng:35.2142244,t:"pub",acc:false},
+  {n:"Public Shelter No. 606",a:"1 Pnina St.",nb:"Romema",cap:64,area:80,op:"Jerusalem Municipality",lat:31.79562485,lng:35.21447235,t:"pub",acc:false},
+  {n:"Public Shelter No. 750",a:"5 Zichron Ya'akov St.",nb:"Romema",cap:104,area:130,op:"Romema Community Administration",lat:31.79611804,lng:35.20083957,t:"pub",acc:false},
+  {n:"Public Shelter No. 933",a:"38 HaMem Gimel St.",nb:"Romema",cap:80,area:100,op:"Lev Malka organization",lat:31.79601192,lng:35.1991455,t:"pub",acc:false},
+  {n:"Public Shelter No. 975 Alef",a:"15 Zichron Ya'akov St.",nb:"Romema",cap:40,area:50,op:"Jerusalem Municipality",lat:31.79447697,lng:35.20174810,t:"pub",acc:false},
+  {n:"Public Shelter No. 975 Bet",a:"17 Zichron Ya'akov St.",nb:"Romema",cap:40,area:50,op:"Drachei Miryam",lat:31.79422545,lng:35.20202255,t:"pub",acc:false},
+  {n:"Public Shelter No. 975 Gimel",a:"19 Zichron Ya'akov St.",nb:"Romema",cap:40,area:50,op:"Lev Malka",lat:31.79395477,lng:35.20219002,t:"pub",acc:false},
+  {n:"Public Shelter No. 975 Daled",a:"21 Zichron Ya'akov St.",nb:"Romema",cap:40,area:50,op:"Jerusalem Municipality",lat:31.79353551,lng:35.20219698,t:"pub",acc:false},
+  {n:"Public Shelter No. 979",a:"10 Zichron Ya'akov St.",nb:"Romema",cap:80,area:100,op:"Hanichei HaYeshivot Romema synagogue",lat:31.79507382,lng:35.20108273,t:"pub",acc:true},
+  {n:"Public Shelter No. 602",a:"6 HaSanhedrin St.",nb:"Sanhedria",cap:80,area:100,op:"Hasidei Morditz yeshiva",lat:31.79755634,lng:35.21872527,t:"pub",acc:false},
+  {n:"Public Shelter No. 604",a:"8 Shimon Hacham St.",nb:"Shmuel HaNavi",cap:80,area:100,op:"Jerusalem Municipality",lat:31.79541215,lng:35.2188737,t:"pub",acc:false},
+  {n:"Public Shelter No. 616",a:"61 Shmuel Hanavi St.",nb:"Shmuel HaNavi",cap:80,op:"Jerusalem Municipality",lat:31.79249233,lng:35.22309569,t:"pub",acc:false},
+  {n:"Public Shelter No. 618",a:"66 Shmuel HaNavi St.",nb:"Shmuel HaNavi",cap:137,area:110,op:"Ohalei Ya'akov synagogue",lat:31.79286073,lng:35.22315682,t:"pub",acc:false},
+  {n:"Public Shelter No. 957",a:"19 Avinadav St.",nb:"Shmuel HaNavi",cap:360,area:450,op:"Agudat Or HaTzafon synagogue",lat:31.79461697,lng:35.2189116,t:"pub",acc:false},
+  {n:"Public Shelter No. 807",a:"7 Benjamin Disraeli St.",nb:"Talbiya",cap:92,area:115,op:"Jerusalem Municipality",lat:31.77014346,lng:35.21700218,t:"pub",acc:false},
+  {n:"Public Shelter No. 679",a:"59 Hebron Rd.",nb:"Talpiot",cap:160,area:200,op:"Jerusalem Municipality",lat:31.76343666,lng:35.2256433,t:"pub",acc:false},
+  {n:"Public Shelter No. 688",a:"18 Efrata St.",nb:"Talpiot",cap:160,area:200,op:"Jerusalem Municipality",lat:31.75254609,lng:35.22182315,t:"pub",acc:false},
+  {n:"Public Shelter No. 689",a:"10 Ben Gavriel St.",nb:"Talpiot",cap:72,area:90,op:"Jerusalem Municipality",lat:31.74909478,lng:35.2200234,t:"pub",acc:false},
+  {n:"Public Shelter No. 690",a:"1 Leib Yaffe St.",nb:"Talpiot",cap:192,area:240,op:"Jerusalem Municipality",lat:31.74919744,lng:35.2234383,t:"pub",acc:false},
+  {n:"Public Shelter No. 691",a:"93 Bethlehem Rd.",nb:"Talpiot",cap:352,area:440,op:"Jerusalem Municipality",lat:31.75208777,lng:35.21891075,t:"pub",acc:false},
+  {n:"Public Shelter No. 940",a:"17 Shalom Yehuda St.",nb:"Talpiot",cap:80,area:100,op:"Ezra youth movement",lat:31.75119887,lng:35.22008993,t:"pub",acc:false},
+  {n:"Public Shelter No. 928",a:"8 Pri Hadash St.",nb:"Zichron Moshe",cap:104,area:130,op:"Or Leah organization",lat:31.78741269,lng:35.21757937,t:"pub",acc:false},
+  // Underground Parking
+  {n:"Beit Avichai",a:"44 King George St.",nb:"Rehavia",lat:31.77726737,lng:35.21579183,t:"park"},
+  {n:"Bayit Banita",a:"14 HaUman St.",nb:"Talpiot",lat:31.75091953,lng:35.20970825,t:"park"},
+  {n:"Beit Yahav",a:"80 Yirmiyahu St.",nb:"Romema",lat:31.79133351,lng:35.20028136,t:"park"},
+  {n:"Clal Building",a:"97 Jaffa St.",nb:"City Center",lat:31.78421271,lng:35.21517979,t:"park"},
+  {n:"Hi-Tech Park 4",a:"2 Agudat Sport Hapoel Rd.",nb:"Malha",lat:31.75002694,lng:35.18600107,t:"park"},
+  {n:"Hi-Tech Park Buildings 1-2",a:"2 Agudat Sport Hapoel Rd.",nb:"Malha",lat:31.75003606,lng:35.18599035,t:"park"},
+  {n:"Hi-Tech Park Building 5",a:"2 Agudat Sport Hapoel Rd.",nb:"Malha",lat:31.75006343,lng:35.18601180,t:"park"},
+  {n:"Hi-Tech Park Buildings 8-9",a:"2 Agudat Sport Hapoel Rd.",nb:"Malha",lat:31.74956516,lng:35.18663917,t:"park"},
+  {n:"Central Bus Station",a:"224 Jaffa St.",nb:"Romema",lat:31.78955543,lng:35.20335428,t:"park"},
+  {n:"Halonot Yerushalayim",a:"40 Agripas St.",nb:"Mahane Yehuda",lat:31.78433562,lng:35.21431678,t:"park"},
+  {n:"Shanior Peleg Tzafon",a:"1 Shanior Peleg St.",nb:"Arnona",lat:31.75250058,lng:35.22459397,t:"park"},
+  {n:"Shanior Peleg Darom",a:"2 Shneor Peleg St.",nb:"Arnona",lat:31.75248101,lng:35.22462300,t:"park"},
+  {n:"Oranim",a:"66 Kanfei Nesharim St.",nb:"Givat Shaul",lat:31.78735519,lng:35.18123849,t:"park"},
+  {n:"Bonaventura",a:"5 Enzo Bonaventura St.",nb:"Arnona",lat:31.75326483,lng:35.22716150,t:"park"},
+  {n:"Beit HaShinhav",a:"12 Beit HaDfus St.",nb:"Givat Shaul",lat:31.78660705,lng:35.18839187,t:"park"},
+  {n:"Binyanei HaUma (ICC)",a:"1 Shazar Blvd.",nb:"Kiryat HaUma",lat:31.78651299,lng:35.20231020,t:"park"},
+  {n:"Bezalel",a:"1 Yisrael Zmora St.",nb:"City Center",lat:31.78226898,lng:35.22271963,t:"park"},
+  {n:"Gad Tedeschi",a:"5 Gad Tedeschi St.",nb:"Arnona",lat:31.75235425,lng:35.22681197,t:"park"},
+  {n:"Golda (Mobileye)",a:"Golda Meir Blvd.",nb:"Har Hotzvim",lat:31.80004470,lng:35.20892522,t:"park"},
+  {n:"Ganei Tziyon",a:"38 Eliezer Hagadol St.",nb:"Katamon",lat:31.75377989,lng:35.20585640,t:"park"},
+  {n:"David Yellin",a:"7 Ma'agal Beit HaMidrash St.",nb:"Beit HaKerem",lat:31.78218806,lng:35.19070503,t:"park"},
+  {n:"Dona",a:"20 Beit HaDfus St.",nb:"Givat Shaul",lat:31.78667191,lng:35.18618533,t:"park"},
+  {n:"Derech Beit Lechem",a:"66 Bethlehem Rd.",nb:"Talpiot",lat:31.75923875,lng:35.22167707,t:"park"},
+  {n:"HaTeatron",a:"Prof. Yaakov Shaskin St.",nb:"Talbiyeh",lat:31.76799201,lng:35.21644584,t:"park"},
+  {n:"Heletz",a:"8 Heletz St.",nb:"Baka",lat:31.75716150,lng:35.21648405,t:"park"},
+  {n:"Tahun",a:"13 Yaakov Tahun St.",nb:"Kiryat Yovel",lat:31.76159358,lng:35.17523615,t:"park"},
+  {n:"Yad Sarah",a:"35 Yirmiyahu St.",nb:"Romema",lat:31.79082012,lng:35.20231673,t:"park"},
+  {n:"Yitzhak Ben Dor",a:"3 Yitzhak Ben Dor St.",nb:"Arnona",lat:31.75418005,lng:35.22718756,t:"park"},
+  {n:"Migdal Hanesharim",a:"32 Beit HaDfus St.",nb:"Givat Shaul",lat:31.78669687,lng:35.18086269,t:"park"},
+  {n:"Habira Towers",a:"39 Yirmiyahu St.",nb:"Romema",lat:31.79087480,lng:35.20215290,t:"park"},
+  {n:"Museum of Tolerance",a:"33 Hillel St.",nb:"City Center",lat:31.78027286,lng:35.21948341,t:"park"},
+  {n:"Mamilla",a:"6 Yitzhak Kariv St.",nb:"Mamilla",lat:31.77734128,lng:35.22491008,t:"park"},
+  {n:"Menorah",a:"3 Menora St.",nb:"City Center",lat:31.78040776,lng:35.21281430,t:"park"},
+  {n:"Parking - David's Citadel",a:"7 Yitzhak Kariv St.",nb:"Mamilla",lat:31.77733145,lng:35.22514885,t:"park"},
+  {n:"Ministry of Education",a:"2 Dvorah Haneviah St.",nb:"City Center",lat:31.78449857,lng:35.22397310,t:"park"},
+  {n:"Safra",a:"26 Jaffa St.",nb:"City Center",lat:31.77993978,lng:35.22492106,t:"park"},
+  {n:"Chile Parking",a:"6 Chile St.",nb:"Kiryat Yovel",lat:31.76157118,lng:35.17173719,t:"park"},
+  {n:"Rav Shefa",a:"16 Shamgar St.",nb:"Romema",lat:31.79496673,lng:35.20843919,t:"park"},
+  {n:"Rajuan",a:"6 Aliash St.",nb:"City Center",lat:31.78181374,lng:35.21578165,t:"park"},
+  {n:"Shamai 10",a:"10 Shamai St.",nb:"City Center",lat:31.78115430,lng:35.21851142,t:"park"},
+  {n:"Shamai 21",a:"21 Shamai St.",nb:"City Center",lat:31.78142276,lng:35.21891564,t:"park"},
+  {n:"Yerushalayim Zahav",a:"14 Rabbi Akiva St.",nb:"City Center",lat:31.77939730,lng:35.21787462,t:"park"},
+  {n:"Lev Talpiot",a:"17 HaUman St.",nb:"Talpiot",lat:31.75062444,lng:35.20910845,t:"park"},
+  {n:"City Tower",a:"34 Ben Yehuda St.",nb:"City Center",lat:31.78145104,lng:35.21568540,t:"park"},
+  {n:"Migdalei Yerushalayim",a:"6 Rabbi Akiva St.",nb:"City Center",lat:31.77995918,lng:35.21797371,t:"park"},
+  {n:"Etz Hazayit Hotel",a:"26 Saint George St.",nb:"Shimon HaTzadik",lat:31.79002854,lng:35.22873876,t:"park"},
+  {n:"Mesilat David",a:"17 Mesilat Yesharim St.",nb:"Mahane Yehuda",lat:31.78267031,lng:35.21523359,t:"park"},
+  {n:"Shukanyon",a:"88 Agripas St.",nb:"Mahane Yehuda",lat:31.78539909,lng:35.21013559,t:"park"},
+  {n:"Sha'arei Ha'ir",a:"216 Jaffa St.",nb:"Romema",lat:31.78974972,lng:35.20532547,t:"park"},
+];
+
+// MAP — no CSS filter, clean OSM tiles
+const map = L.map('map', {
+  center: [31.7767, 35.2145],
+  zoom: 14,
+  zoomControl: false,
+  preferCanvas: true
+});
+
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
+  maxZoom: 19
+}).addTo(map);
+
+// Force map to fill the whole viewport
+function resize() {
+  const m = document.getElementById('map');
+  m.style.width  = window.innerWidth  + 'px';
+  m.style.height = window.innerHeight + 'px';
+  map.invalidateSize(true);
+}
+resize();
+window.addEventListener('resize', resize);
+setTimeout(resize, 200);
+setTimeout(resize, 800);
+
+// ICONS
+function mkIcon(color) {
+  const s = 14;
+  return L.divIcon({
+    className:'',
+    html:`<div style="width:${s}px;height:${s}px;background:${color};border-radius:50%;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div>`,
+    iconSize:[s,s], iconAnchor:[s/2,s/2]
+  });
+}
+
+let markers=[], pubC=0, parkC=0, accC=0;
+
+SHELTERS.forEach(s => {
+  if (!s.lat||!s.lng) return;
+  const color = s.t==='park' ? '#3dbfa8' : (s.acc ? '#f0c94a' : '#4da6e8');
+  const m = L.marker([s.lat,s.lng],{icon:mkIcon(color)});
+  const tag = s.t==='park' ? 'Protected Underground Parking' : (s.acc ? 'Accessible Shelter' : 'Public Shelter');
+  const capH = s.cap ? `<div class="pu-cap"><div class="pu-stat"><div class="v">${s.cap}</div><div class="l">Capacity</div></div>${s.area?`<div class="pu-stat"><div class="v">${s.area}</div><div class="l">Area m²</div></div>`:''}</div>` : '';
+  m.bindPopup(`<div class="pu">
+    <div class="pu-tag">${tag}</div>
+    <div class="pu-name">${s.n}</div>
+    <div class="pu-row"><div class="pu-lbl">Address</div><div class="pu-val">${s.a}</div></div>
+    <div class="pu-row"><div class="pu-lbl">District</div><div class="pu-val">${s.nb}</div></div>
+    ${s.op?`<div class="pu-row"><div class="pu-lbl">Operator</div><div class="pu-val">${s.op}</div></div>`:''}
+    ${capH}
+  </div>`,{maxWidth:300});
+  m.addTo(map);
+  markers.push({m,s});
+  if(s.t==='park') parkC++; else pubC++;
+  if(s.acc) accC++;
+});
+
+document.getElementById('sc').textContent = '('+pubC+')';
+document.getElementById('sc-all').textContent = '('+(pubC+parkC)+')';
+document.getElementById('pc').textContent = '('+parkC+')';
+document.getElementById('ac').textContent = '('+accC+')';
+// counter removed
+
+function applyFilter(f) {
+  ['all','public','parking','access'].forEach(id=>document.getElementById('f-'+id).classList.toggle('on',id===f));
+  let c=0;
+  markers.forEach(({m,s})=>{
+    const show=f==='all'||(f==='public'&&s.t==='pub')||(f==='parking'&&s.t==='park')||(f==='access'&&s.acc);
+    show?m.addTo(map):m.remove();
+    if(show)c++;
+  });
+  // counter removed
+}
+
+function doSearch(v){
+  const dd=document.getElementById('search-dropdown');
+  if(!v||v.length<2){dd.style.display='none';return;}
+  const q=v.toLowerCase();
+  const hits=SHELTERS.filter(s=>s.n.toLowerCase().includes(q)||s.a.toLowerCase().includes(q)||s.nb.toLowerCase().includes(q)).slice(0,8);
+  if(!hits.length){dd.style.display='none';return;}
+  dd.style.display='block';
+  dd.innerHTML=hits.map(s=>`<div class="sr-item" onmousedown="goTo(${s.lat},${s.lng},${JSON.stringify(s.n)})"><div class="sr-name">${s.n}</div><div class="sr-addr">${s.a} · ${s.nb}</div></div>`).join('');
+}
+
+function goTo(lat,lng,name){
+  map.flyTo([lat,lng],17,{duration:1.2});
+  document.getElementById('search-dropdown').style.display='none';
+  document.getElementById('search-input').value=name;
+  const e=markers.find(({s})=>s.lat===lat&&s.lng===lng);
+  if(e) setTimeout(()=>e.m.openPopup(),1300);
+}
+
+
+// LOCATION
+let locationMarker = null;
+let locationCircle = null;
+
+function locateMe() {
+  const btn = document.getElementById('locate-btn');
+  if (!navigator.geolocation) {
+    alert('Geolocation is not supported by your browser.');
+    return;
+  }
+  btn.textContent = '⏳';
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const acc = pos.coords.accuracy;
+
+      if (locationMarker) { locationMarker.remove(); }
+      if (locationCircle) { locationCircle.remove(); }
+
+      locationCircle = L.circle([lat, lng], {
+        radius: acc,
+        color: '#4da6e8',
+        fillColor: '#4da6e8',
+        fillOpacity: 0.12,
+        weight: 1.5
+      }).addTo(map);
+
+      locationMarker = L.marker([lat, lng], {
+        icon: L.divIcon({
+          className: '',
+          html: '<div style="width:16px;height:16px;background:#4da6e8;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.5);"></div>',
+          iconSize: [16,16], iconAnchor: [8,8]
+        })
+      }).addTo(map);
+
+      map.flyTo([lat, lng], 16, { duration: 1.5 });
+      btn.textContent = '📍';
+      btn.classList.add('active');
+    },
+    function(err) {
+      btn.textContent = '📍';
+      const msgs = {1:'Location access denied. Please enable it in your browser settings.', 2:'Location unavailable.', 3:'Location request timed out.'};
+      alert(msgs[err.code] || 'Could not get your location.');
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+}
+
+function closeSearch(){document.getElementById('search-dropdown').style.display='none';}
+</script>
+
+</body>
+</html>
