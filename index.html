@@ -547,6 +547,12 @@ SHELTERS.forEach(s => {
     ${s.op?`<div class="pu-row"><div class="pu-lbl">Operator</div><div class="pu-val">${s.op}</div></div>`:''}
     ${capH}
   </div>`,{maxWidth:300});
+  m.on('click', function() {
+    if (locationMarker) {
+      const userLatLng = locationMarker.getLatLng();
+      drawRoute(userLatLng.lat, userLatLng.lng, s.lat, s.lng, s.n);
+    }
+  });
   m.addTo(map);
   markers.push({m,s});
   if(s.t==='park') parkC++; else pubC++;
@@ -594,6 +600,43 @@ let locationMarker = null;
 let locationCircle = null;
 let nearestLine = null;
 let nearestMarkerHighlight = null;
+
+let routeLayers = [];
+
+function clearRoute() {
+  routeLayers.forEach(l => l.remove());
+  routeLayers = [];
+  if (nearestMarkerHighlight) { nearestMarkerHighlight.remove(); nearestMarkerHighlight = null; }
+  if (nearestLine) { nearestLine.remove(); nearestLine = null; }
+}
+
+function drawRoute(fromLat, fromLng, toLat, toLng, shelterName) {
+  clearRoute();
+  fetch(`https://router.project-osrm.org/route/v1/foot/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.routes && data.routes.length > 0) {
+        const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+        const walkDist = data.routes[0].distance;
+        const walkTime = Math.round(data.routes[0].duration / 60);
+        const walkDistText = walkDist < 1000 ? Math.round(walkDist) + ' m' : (walkDist/1000).toFixed(1) + ' km';
+        const outline = L.polyline(coords, { color: '#000000', weight: 8, opacity: 0.4 }).addTo(map);
+        const line = L.polyline(coords, { color: '#00aaff', weight: 5, opacity: 1 }).addTo(map);
+        routeLayers = [outline, line];
+        nearestLine = line;
+        showToast('🚶 ' + shelterName + ' · ' + walkDistText + ' · ~' + walkTime + ' min walk');
+        const bounds = L.latLngBounds([[fromLat, fromLng], [toLat, toLng]]);
+        map.flyToBounds(bounds, { padding: [80, 80], duration: 1.2 });
+      }
+    })
+    .catch(() => {
+      const line = L.polyline([[fromLat, fromLng], [toLat, toLng]], {
+        color: '#00aaff', weight: 5, dashArray: '8,5', opacity: 1
+      }).addTo(map);
+      routeLayers = [line];
+      nearestLine = line;
+    });
+}
 
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 6371000;
@@ -655,37 +698,8 @@ function locateMe() {
           ? Math.round(dist) + ' m'
           : (dist/1000).toFixed(1) + ' km';
 
-        // Fetch walking route from OSRM
-        fetch(`https://router.project-osrm.org/route/v1/foot/${lng},${lat};${shelter.lng},${shelter.lat}?overview=full&geometries=geojson`)
-          .then(r => r.json())
-          .then(data => {
-            if (data.routes && data.routes.length > 0) {
-              const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-              const walkDist = data.routes[0].distance;
-              const walkTime = Math.round(data.routes[0].duration / 60);
-              const walkDistText = walkDist < 1000 ? Math.round(walkDist) + ' m' : (walkDist/1000).toFixed(1) + ' km';
-              // Dark outline for contrast
-              nearestLine = L.polyline(coords, {
-                color: '#000000', weight: 8, opacity: 0.4
-              }).addTo(map);
-              // Bright blue line on top
-              L.polyline(coords, {
-                color: '#00aaff', weight: 5, opacity: 1
-              }).addTo(map);
-              showToast('🚶 ' + shelter.n + ' · ' + walkDistText + ' · ~' + walkTime + ' min walk');
-            } else {
-              // Fallback to straight line
-              nearestLine = L.polyline([[lat, lng], [shelter.lat, shelter.lng]], {
-                color: '#ffffff', weight: 4, dashArray: '8,5', opacity: 1
-              }).addTo(map);
-            }
-          })
-          .catch(() => {
-            // Fallback to straight line if routing fails
-            nearestLine = L.polyline([[lat, lng], [shelter.lat, shelter.lng]], {
-              color: '#ffffff', weight: 4, dashArray: '8,5', opacity: 1
-            }).addTo(map);
-          });
+        // Draw walking route to nearest shelter
+        drawRoute(lat, lng, shelter.lat, shelter.lng, shelter.n);
 
         // Gold pulsing ring around nearest shelter
         nearestMarkerHighlight = L.marker([shelter.lat, shelter.lng], {
